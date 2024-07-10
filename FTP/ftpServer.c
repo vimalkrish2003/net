@@ -1,80 +1,61 @@
-// Server (FTP)
-#include <stdio.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
 
+
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdlib.h> //for exit
 int main()
 {
+    int server_sock_desc, client_sock_desc;
+    char buffer[1024];
+    struct sockaddr_in serverAddr, clientAddr;
+    socklen_t clientAddrSize;
     FILE *fp;
-    int sd, newsd, bd, port;
-    socklen_t clilen;
-    char rcv[100], fileread[100];
-    struct sockaddr_in servaddr, cliaddr;
 
-    printf("Enter the port address: ");
-    scanf("%d", &port);
+    // create server socket and its address
+    server_sock_desc = socket(AF_INET, SOCK_STREAM, 0);
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(5600);
+    serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-    sd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sd < 0) {
-        perror("Can't create socket");
-        return -1;
-    }
-    printf("Socket is created.\n");
+    // bind socket
+    bind(server_sock_desc, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
 
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(port);
+    // listen for connections
+    if (listen(server_sock_desc, 5) < 0)
+        printf("Unable to listen!!!!Try Again");
+    else
+        printf("Listening at port:5600\n");
 
-    bd = bind(sd, (struct sockaddr *)&servaddr, sizeof(servaddr));
-    if (bd < 0) {
-        perror("Can't bind");
-        return -1;
-    }
-    printf("Binded.\n");
+    // Accept a connection
+    client_sock_desc = accept(server_sock_desc, (struct sockaddr *)&clientAddr, &clientAddrSize);
+    printf("Connection established with client\n");
 
-    listen(sd, 5);
-
-    clilen = sizeof(cliaddr);
-    newsd = accept(sd, (struct sockaddr *)&cliaddr, &clilen);
-    if (newsd < 0) {
-        perror("Can't accept");
-        return -1;
-    }
-    printf("Accepted.\n");
-
-    int n = recv(newsd, rcv, sizeof(rcv) - 1, 0);
-    if (n < 0) {
-        perror("Can't receive filename");
-        return -1;
-    }
-    rcv[n] = '\0';
-
-    fp = fopen(rcv, "r");
-    if (fp == NULL) {
-        perror("Can't open file");
-        send(newsd, "error!", 6, 0);
-        close(newsd);
-        return -1;
+    // receive filename from client
+    recv(client_sock_desc, buffer, sizeof(buffer), 0);
+    printf("Client REQUESTED for file: %s\n", buffer);
+    fp = fopen(buffer, "r");
+    if (fp == NULL)
+    {
+        printf("FILE NOT FOUND!!!\n");
+        send(client_sock_desc, "NOF", sizeof("NOF"), 0);
+        exit(1);
     }
 
-    while (fgets(fileread, sizeof(fileread), fp)) {
-        if (send(newsd, fileread, strlen(fileread), 0) < 0) {
-            perror("Can't send file contents");
-            return -1;
-        }
-        sleep(1);
+    // send file to client
+    printf("Sending File to client....\n");
+    while (fgets(buffer, sizeof(buffer), fp))
+    {
+        send(client_sock_desc, buffer, sizeof(buffer), 0);
     }
-
-    if (feof(fp)) {
-        send(newsd, "completed", strlen("completed"), 0);
-    }
-
+    send(client_sock_desc, "EOF", sizeof("EOF"), 0);
+    printf("File sent\n");
     fclose(fp);
-    close(newsd);
-    close(sd);
+    close(client_sock_desc);
+    close(server_sock_desc);
 
     return 0;
 }

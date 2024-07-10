@@ -7,28 +7,28 @@
 int main()
 {
     char buf[100];
-    int sock_desc, temp_sock_desc;
-    struct sockaddr_in server;
-    socklen_t len; // Declare a variable for the size of server
+    int server_sock_desc, client_sock_desc;
+    struct sockaddr_in server, client; // Declare a separate struct for the client
+    socklen_t client_len;              // Declare a variable for the size of client
 
-    sock_desc = socket(AF_INET, SOCK_STREAM, 0);
+    server_sock_desc = socket(AF_INET, SOCK_STREAM, 0);
 
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = INADDR_ANY;
     server.sin_port = htons(3003);
 
-    bind(sock_desc, (struct sockaddr *)&server, sizeof(server));
+    bind(server_sock_desc, (struct sockaddr *)&server, sizeof(server));
 
-    listen(sock_desc, 5);
+    listen(server_sock_desc, 5);
 
-    len = sizeof(server); // Set len to the size of server
-    temp_sock_desc = accept(sock_desc, (struct sockaddr *)&server, &len); // Pass &len instead of &(sizeof(server))
-    recv(temp_sock_desc, buf, sizeof(buf) - 1, 0);
+    client_len = sizeof(client);                                                          // Set client_len to the size of client
+    client_sock_desc = accept(server_sock_desc, (struct sockaddr *)&client, &client_len); // Use client here
+    recv(client_sock_desc, buf, sizeof(buf) - 1, 0);
 
     buf[sizeof(buf) - 1] = '\0';
     printf("Message got from client: %s", buf);
 
-    close(temp_sock_desc); // Now close should be recognized
+    close(client_sock_desc); // Now close should be recognized
 
     return 0;
 }
